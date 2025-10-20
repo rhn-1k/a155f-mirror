@@ -41,7 +41,11 @@ jobs:
           tar -xzf kernel.tar.gz
           
           echo "Setting up workspace..."
-          mv kernel/kernel/* .
+          # This command moves all contents, including hidden files, from the nested directory
+          # to the current directory.
+          mv kernel/kernel/.* kernel/kernel/* .
+          
+          echo "Cleaning up directories..."
           rm -rf kernel kernel.tar.gz
 
       - name: Download and Extract Toolchain

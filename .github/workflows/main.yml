@@ -34,24 +34,22 @@ jobs:
 
       - name: Download and Set Up Workspace
         run: |
-          # 1. Download the archive
+          echo "Downloading kernel source..."
           curl -L -o kernel.tar.gz "${{ github.event.inputs.KERNEL_URL }}"
           
-          # 2. Extract it, creating the 'kernel' directory
+          echo "Extracting Kernel Source..."
           tar -xzf kernel.tar.gz
           
-          # 3. Move all contents from the 'kernel' directory to the current directory
-          mv kernel/* .
-          
-          # 4. Remove the now-empty 'kernel' directory
-          rmdir kernel
-          
-          # 5. Clean up the downloaded archive
-          rm kernel.tar.gz
+          echo "Setting up workspace..."
+          mv kernel/kernel/* .
+          rm -rf kernel kernel.tar.gz
 
       - name: Download and Extract Toolchain
         run: |
+          echo "Downloading toolchain..."
           curl -LO "${{ github.event.inputs.TOOLCHAIN_URL }}"
+          
+          echo "Extracting Toolchain..."
           FILE_NAME=$(basename "${{ github.event.inputs.TOOLCHAIN_URL }}")
           tar -xf "$FILE_NAME"
           rm "$FILE_NAME"

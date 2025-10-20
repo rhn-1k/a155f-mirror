@@ -23,10 +23,9 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+      # This step is no longer needed as the archive contains everything.
+      # - name: Checkout Repository
+      #   uses: actions/checkout@v4
 
       - name: Install Build Dependencies
         run: |
@@ -39,13 +38,15 @@ jobs:
 
       - name: Download and Extract Kernel Source
         run: |
+          # Download the archive which contains the 'kernel' directory and all scripts
           curl -L -o kernel.tar.gz "${{ github.event.inputs.KERNEL_URL }}"
           tar -xzf kernel.tar.gz
           rm kernel.tar.gz
-          # All subsequent commands will work inside the 'kernel' directory
+          # Set the working directory for all subsequent steps
           echo "WORKING_DIR=kernel" >> $GITHUB_ENV
 
       - name: Download and Extract Toolchain
+        working-directory: ${{ env.WORKING_DIR }}
         run: |
           curl -LO "${{ github.event.inputs.TOOLCHAIN_URL }}"
           FILE_NAME=$(basename "${{ github.event.inputs.TOOLCHAIN_URL }}")
@@ -67,14 +68,9 @@ jobs:
         id: build_chain
         working-directory: ${{ env.WORKING_DIR }}
         run: |
-          # Modify the build script to add the developer name
           sed -i '/# KernelSU Next configs/i ./kernel-5.10/scripts/config --file kernel-5.10/arch/arm64/configs/a15_00_defconfig --set-str LOCALVERSION "-${{ github.event.inputs.DEVELOPER_NAME }}"' build_kernel.sh
-          
-          # Execute the build and repack scripts
           ./build_kernel.sh
           ./scripts/repack
-          
-          # Find the generated tarball and set it as an output
           FINAL_TAR=$(ls -t *.tar | head -n 1)
           if [ -z "$FINAL_TAR" ]; then
             echo "::error::Final .tar file not found!"
@@ -85,7 +81,6 @@ jobs:
 
       - name: Upload Final Tarball to Gofile
         run: |
-          # The path to the final tarball is now inside the 'kernel' directory
           FILE_PATH="${{ env.WORKING_DIR }}/${{ steps.build_chain.outputs.final_tar_name }}"
           RESPONSE=$(curl -F "file=@${FILE_PATH}" \
                           -H "Authorization: Bearer E29ro0ueg1dXX7CHmJSdrO9puOTUMREk" \

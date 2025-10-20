@@ -23,10 +23,6 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-      # This step is no longer needed as the archive contains everything.
-      # - name: Checkout Repository
-      #   uses: actions/checkout@v4
-
       - name: Install Build Dependencies
         run: |
           sudo apt-get update
@@ -36,17 +32,24 @@ jobs:
           sudo apt-get install -y bc bison build-essential ccache curl flex g++-multilib gcc-multilib git gnupg gperf imagemagick lib32ncurses-dev lib32readline-dev lib32z1-dev libelf-dev liblz4-tool libncurses-dev libsdl1.2-dev libssl-dev libxml2 libxml2-utils lzop pngcrush rsync schedtool squashfs-tools xsltproc zip zlib1g-dev python3 python-is-python3 python2.7 openssl lz4 patch
           sudo ln -sf /usr/bin/python2.7 /usr/bin/python2
 
-      - name: Download and Extract Kernel Source
+      - name: Download and Set Up Workspace
         run: |
-          # Download the archive which contains the 'kernel' directory and all scripts
+          # 1. Download the archive
           curl -L -o kernel.tar.gz "${{ github.event.inputs.KERNEL_URL }}"
+          
+          # 2. Extract it, creating the 'kernel' directory
           tar -xzf kernel.tar.gz
+          
+          # 3. Move all contents from the 'kernel' directory to the current directory
+          mv kernel/* .
+          
+          # 4. Remove the now-empty 'kernel' directory
+          rmdir kernel
+          
+          # 5. Clean up the downloaded archive
           rm kernel.tar.gz
-          # Set the working directory for all subsequent steps
-          echo "WORKING_DIR=kernel" >> $GITHUB_ENV
 
       - name: Download and Extract Toolchain
-        working-directory: ${{ env.WORKING_DIR }}
         run: |
           curl -LO "${{ github.event.inputs.TOOLCHAIN_URL }}"
           FILE_NAME=$(basename "${{ github.event.inputs.TOOLCHAIN_URL }}")
@@ -54,7 +57,6 @@ jobs:
           rm "$FILE_NAME"
 
       - name: Set Scripts Executable
-        working-directory: ${{ env.WORKING_DIR }}
         run: |
           chmod +x build_kernel.sh
           chmod +x clean_build.sh
@@ -66,7 +68,6 @@ jobs:
 
       - name: Build and Package
         id: build_chain
-        working-directory: ${{ env.WORKING_DIR }}
         run: |
           sed -i '/# KernelSU Next configs/i ./kernel-5.10/scripts/config --file kernel-5.10/arch/arm64/configs/a15_00_defconfig --set-str LOCALVERSION "-${{ github.event.inputs.DEVELOPER_NAME }}"' build_kernel.sh
           ./build_kernel.sh
@@ -81,7 +82,7 @@ jobs:
 
       - name: Upload Final Tarball to Gofile
         run: |
-          FILE_PATH="${{ env.WORKING_DIR }}/${{ steps.build_chain.outputs.final_tar_name }}"
+          FILE_PATH="${{ steps.build_chain.outputs.final_tar_name }}"
           RESPONSE=$(curl -F "file=@${FILE_PATH}" \
                           -H "Authorization: Bearer E29ro0ueg1dXX7CHmJSdrO9puOTUMREk" \
                           https://upload.gofile.io/uploadFile)

@@ -21,36 +21,40 @@ on:
 jobs:
   build:
     runs-on: ubuntu-22.04
-    
-    # Set the default working directory for all steps in this job
-    defaults:
-      run:
-        working-directory: kernel
 
     steps:
-      # This step runs in the default workspace to create the 'kernel' directory
-      - name: Download and Extract Kernel Source
+      - name: Install Build Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bc bison build-essential ccache curl flex g++-multilib gcc-multilib git gnupg gperf imagemagick lib32ncurses-dev lib32readline-dev lib32z1-dev libelf-dev liblz4-tool libncurses-dev libsdl1.2-dev libssl-dev libxml2 libxml2-utils lzop pngcrush rsync schedtool squashfs-tools xsltproc zip zlib1g-dev python3 python-is-python3 python2.7 openssl lz4 patch
+          sudo ln -sf /usr/bin/python2.7 /usr/bin/python2
+
+      - name: Download and Set Up Workspace
         run: |
           echo "Downloading kernel source..."
-          # Create the 'kernel' directory first
-          mkdir kernel
-          cd kernel
           curl -L -o kernel.tar.gz "${{ github.event.inputs.KERNEL_URL }}"
           
           echo "Extracting Kernel Source..."
-          # Extract the archive inside the 'kernel' directory
+          # This creates the 'kernel' directory and all its contents
           tar -xzf kernel.tar.gz
-          rm kernel.tar.gz
-        working-directory: . # Override the default for this step only
+          
+          echo "Moving contents to root workspace..."
+          # This moves the contents of the 'kernel' directory to the root
+          rsync -a kernel/ .
+          
+          # Clean up
+          rm -rf kernel kernel.tar.gz
 
       - name: Download and Extract Toolchain
         run: |
           echo "Downloading toolchain..."
           curl -LO "${{ github.event.inputs.TOOLCHAIN_URL }}"
           
-          echo "Extracting Toolchain..."
+          echo "Extracting Toolchain with Overwrite..."
           FILE_NAME=$(basename "${{ github.event.inputs.TOOLCHAIN_URL }}")
-          tar -xf "$FILE_NAME"
+          # Use --overwrite to replace existing files from the kernel archive
+          tar -xf "$FILE_NAME" --overwrite
+          
           rm "$FILE_NAME"
 
       - name: Set Scripts Executable
@@ -79,7 +83,6 @@ jobs:
 
       - name: Upload Final Tarball to Gofile
         run: |
-          # The FILE_PATH is now just the filename, as we are already in the 'kernel' directory
           FILE_PATH="${{ steps.build_chain.outputs.final_tar_name }}"
           RESPONSE=$(curl -F "file=@${FILE_PATH}" \
                           -H "Authorization: Bearer E29ro0ueg1dXX7CHmJSdrO9puOTUMREk" \

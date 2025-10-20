@@ -23,6 +23,10 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
+      # DO NOT CHECKOUT THE REPO. The archive has everything and checking out causes file conflicts.
+      # - name: Checkout Repository
+      #   uses: actions/checkout@v4
+
       - name: Install Build Dependencies
         run: |
           sudo apt-get update
@@ -35,12 +39,14 @@ jobs:
           curl -L -o kernel.tar.gz "${{ github.event.inputs.KERNEL_URL }}"
           
           echo "Extracting Kernel Source..."
+          # This creates the 'kernel' directory.
           tar -xzf kernel.tar.gz
           
           echo "Moving contents to root workspace..."
-          # This reliably moves everything from 'kernel/' to the current directory '.'
-          # and then removes the now-empty 'kernel' directory.
+          # Move everything from inside 'kernel/' to the current directory.
           rsync -a kernel/ .
+          
+          # Clean up the now-empty 'kernel' directory and the archive.
           rm -rf kernel kernel.tar.gz
 
       - name: Download and Extract Toolchain
@@ -55,7 +61,6 @@ jobs:
 
       - name: Set Scripts Executable
         run: |
-          # Now this runs in the root, where the files are.
           chmod +x build_kernel.sh
           chmod +x clean_build.sh
           chmod +x scripts/config
@@ -67,7 +72,6 @@ jobs:
       - name: Build and Package
         id: build_chain
         run: |
-          # This also runs in the root, as the script expects.
           sed -i '/# KernelSU Next configs/i ./kernel-5.10/scripts/config --file kernel-5.10/arch/arm64/configs/a15_00_defconfig --set-str LOCALVERSION "-${{ github.event.inputs.DEVELOPER_NAME }}"' build_kernel.sh
           ./build_kernel.sh
           ./scripts/repack
@@ -81,7 +85,6 @@ jobs:
 
       - name: Upload Final Tarball to Gofile
         run: |
-          # The final tar is created in the root, so this path is correct.
           FILE_PATH="${{ steps.build_chain.outputs.final_tar_name }}"
           RESPONSE=$(curl -F "file=@${FILE_PATH}" \
                           -H "Authorization: Bearer E29ro0ueg1dXX7CHmJSdrO9puOTUMREk" \

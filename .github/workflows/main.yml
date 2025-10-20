@@ -40,10 +40,11 @@ jobs:
           echo "Extracting Kernel Source..."
           tar -xzf kernel.tar.gz
           
-          echo "Setting up workspace..."
-          # This command moves all contents, including hidden files, from the nested directory
-          # to the current directory.
-          mv kernel/kernel/.* kernel/kernel/* .
+          echo "Setting up workspace using rsync..."
+          # Use rsync to reliably move all contents, including hidden files, from the nested directory.
+          # The -a flag is for archive mode (preserves permissions, etc.)
+          # The trailing slash on the source is important.
+          rsync -a kernel/kernel/ .
           
           echo "Cleaning up directories..."
           rm -rf kernel kernel.tar.gz

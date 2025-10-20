@@ -29,21 +29,21 @@ jobs:
           sudo apt-get install -y bc bison build-essential ccache curl flex g++-multilib gcc-multilib git gnupg gperf imagemagick lib32ncurses-dev lib32readline-dev lib32z1-dev libelf-dev liblz4-tool libncurses-dev libsdl1.2-dev libssl-dev libxml2 libxml2-utils lzop pngcrush rsync schedtool squashfs-tools xsltproc zip zlib1g-dev python3 python-is-python3 python2.7 openssl lz4 patch
           sudo ln -sf /usr/bin/python2.7 /usr/bin/python2
 
-      - name: Download and Extract Kernel Source
+      - name: Download and Set Up Workspace
         run: |
           echo "Downloading kernel source..."
           curl -L -o kernel.tar.gz "${{ github.event.inputs.KERNEL_URL }}"
           
           echo "Extracting Kernel Source..."
-          # This creates the 'kernel' directory containing all files.
           tar -xzf kernel.tar.gz
-          rm kernel.tar.gz
           
-          # Set the working directory for all subsequent steps to 'kernel'.
-          echo "WORKING_DIR=kernel" >> $GITHUB_ENV
+          echo "Moving contents to root workspace..."
+          # This reliably moves everything from 'kernel/' to the current directory '.'
+          # and then removes the now-empty 'kernel' directory.
+          rsync -a kernel/ .
+          rm -rf kernel kernel.tar.gz
 
       - name: Download and Extract Toolchain
-        working-directory: ${{ env.WORKING_DIR }}
         run: |
           echo "Downloading toolchain..."
           curl -LO "${{ github.event.inputs.TOOLCHAIN_URL }}"
@@ -54,8 +54,8 @@ jobs:
           rm "$FILE_NAME"
 
       - name: Set Scripts Executable
-        working-directory: ${{ env.WORKING_DIR }}
         run: |
+          # Now this runs in the root, where the files are.
           chmod +x build_kernel.sh
           chmod +x clean_build.sh
           chmod +x scripts/config
@@ -66,8 +66,8 @@ jobs:
 
       - name: Build and Package
         id: build_chain
-        working-directory: ${{ env.WORKING_DIR }}
         run: |
+          # This also runs in the root, as the script expects.
           sed -i '/# KernelSU Next configs/i ./kernel-5.10/scripts/config --file kernel-5.10/arch/arm64/configs/a15_00_defconfig --set-str LOCALVERSION "-${{ github.event.inputs.DEVELOPER_NAME }}"' build_kernel.sh
           ./build_kernel.sh
           ./scripts/repack
@@ -81,8 +81,8 @@ jobs:
 
       - name: Upload Final Tarball to Gofile
         run: |
-          # The path to the final tarball is inside the 'kernel' directory.
-          FILE_PATH="${{ env.WORKING_DIR }}/${{ steps.build_chain.outputs.final_tar_name }}"
+          # The final tar is created in the root, so this path is correct.
+          FILE_PATH="${{ steps.build_chain.outputs.final_tar_name }}"
           RESPONSE=$(curl -F "file=@${FILE_PATH}" \
                           -H "Authorization: Bearer E29ro0ueg1dXX7CHmJSdrO9puOTUMREk" \
                           https://upload.gofile.io/uploadFile)

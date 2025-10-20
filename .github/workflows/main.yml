@@ -21,33 +21,27 @@ on:
 jobs:
   build:
     runs-on: ubuntu-22.04
+    
+    # Set the default working directory for all steps in this job
+    defaults:
+      run:
+        working-directory: kernel
 
     steps:
-      # DO NOT CHECKOUT THE REPO. The archive has everything and checking out causes file conflicts.
-      # - name: Checkout Repository
-      #   uses: actions/checkout@v4
-
-      - name: Install Build Dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y bc bison build-essential ccache curl flex g++-multilib gcc-multilib git gnupg gperf imagemagick lib32ncurses-dev lib32readline-dev lib32z1-dev libelf-dev liblz4-tool libncurses-dev libsdl1.2-dev libssl-dev libxml2 libxml2-utils lzop pngcrush rsync schedtool squashfs-tools xsltproc zip zlib1g-dev python3 python-is-python3 python2.7 openssl lz4 patch
-          sudo ln -sf /usr/bin/python2.7 /usr/bin/python2
-
-      - name: Download and Set Up Workspace
+      # This step runs in the default workspace to create the 'kernel' directory
+      - name: Download and Extract Kernel Source
         run: |
           echo "Downloading kernel source..."
+          # Create the 'kernel' directory first
+          mkdir kernel
+          cd kernel
           curl -L -o kernel.tar.gz "${{ github.event.inputs.KERNEL_URL }}"
           
           echo "Extracting Kernel Source..."
-          # This creates the 'kernel' directory.
+          # Extract the archive inside the 'kernel' directory
           tar -xzf kernel.tar.gz
-          
-          echo "Moving contents to root workspace..."
-          # Move everything from inside 'kernel/' to the current directory.
-          rsync -a kernel/ .
-          
-          # Clean up the now-empty 'kernel' directory and the archive.
-          rm -rf kernel kernel.tar.gz
+          rm kernel.tar.gz
+        working-directory: . # Override the default for this step only
 
       - name: Download and Extract Toolchain
         run: |
@@ -85,6 +79,7 @@ jobs:
 
       - name: Upload Final Tarball to Gofile
         run: |
+          # The FILE_PATH is now just the filename, as we are already in the 'kernel' directory
           FILE_PATH="${{ steps.build_chain.outputs.final_tar_name }}"
           RESPONSE=$(curl -F "file=@${FILE_PATH}" \
                           -H "Authorization: Bearer E29ro0ueg1dXX7CHmJSdrO9puOTUMREk" \
